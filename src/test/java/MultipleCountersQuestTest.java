@@ -18,11 +18,11 @@ public class MultipleCountersQuestTest {
         Thread t1 = new Thread(() -> { await(start); r1.run(); });
         Thread t2 = new Thread(() -> { await(start); r2.run(); });
 
-        long t0 = System.currentTimeMillis();
-
-        start.countDown();
         t1.start();
         t2.start();
+
+        long t0 = System.currentTimeMillis();
+        start.countDown();
 
         t1.join();
         t2.join();
@@ -34,7 +34,7 @@ public class MultipleCountersQuestTest {
     }
 
     @Test
-    void runUnpadded() throws Exception {
+    void run() throws Exception {
         final var counters = new Counters();
 
         var result = run(
