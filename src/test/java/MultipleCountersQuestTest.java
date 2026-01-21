@@ -1,5 +1,7 @@
 import org.junit.jupiter.api.Test;
 
+import java.util.concurrent.CountDownLatch;
+
 public class MultipleCountersQuestTest {
 
     final long ITERATIONS = 1_000_000_000;
@@ -11,10 +13,14 @@ public class MultipleCountersQuestTest {
     }
 
     static long run(Runnable r1, Runnable r2) throws Exception {
-        Thread t1 = new Thread(r1);
-        Thread t2 = new Thread(r2);
+        var start = new CountDownLatch(1);
+
+        Thread t1 = new Thread(() -> { await(start); r1.run(); });
+        Thread t2 = new Thread(() -> { await(start); r2.run(); });
 
         long t0 = System.currentTimeMillis();
+
+        start.countDown();
         t1.start();
         t2.start();
 
@@ -23,16 +29,20 @@ public class MultipleCountersQuestTest {
         return System.currentTimeMillis() - t0;
     }
 
+    static void await(CountDownLatch l) {
+        try { l.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+    }
+
     @Test
     void runUnpadded() throws Exception {
         final var counters = new Counters();
 
         var result = run(
                 () -> {
-                    for (long i = 0; i < ITERATIONS; i++) counters.counter1 += 1;
+                    for (int i = 0; i < ITERATIONS; i++) counters.counter1 += 1;
                 },
                 () -> {
-                    for (long i = 0; i < ITERATIONS; i++) counters.counter2 += 1;
+                    for (int i = 0; i < ITERATIONS; i++) counters.counter2 += 1;
                 }
         );
         System.out.println("----------------------------------------------");
