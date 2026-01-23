@@ -4,19 +4,25 @@ import java.util.concurrent.CountDownLatch;
 
 public class MultipleCountersQuestTest {
 
-    final long ITERATIONS = 1_000_000_000;
+    final long ITERATIONS = 1_000_000_000L;
 
     // OOP is a lie.
     static class Counters {
-        volatile long counter1;
-        volatile long counter2;
+        volatile long counter1 = 0L;
+        volatile long counter2 = 0L;
     }
 
     static long run(Runnable r1, Runnable r2) throws Exception {
         var start = new CountDownLatch(1);
 
-        Thread t1 = new Thread(() -> { await(start); r1.run(); });
-        Thread t2 = new Thread(() -> { await(start); r2.run(); });
+        Thread t1 = new Thread(() -> {
+            await(start);
+            r1.run();
+        });
+        Thread t2 = new Thread(() -> {
+            await(start);
+            r2.run();
+        });
 
         t1.start();
         t2.start();
@@ -30,7 +36,11 @@ public class MultipleCountersQuestTest {
     }
 
     static void await(CountDownLatch l) {
-        try { l.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        try {
+            l.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     @Test
