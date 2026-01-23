@@ -49,7 +49,7 @@ public class OopAndCacheMissBench {
 
     // Following AoS you just ignore CPU L1 cache optimizations. OOP - is a cache miss.
     // More fields you have -> less efficient app you get.
-    // L1 memory is Fast but Expensive. Basically you pay money for it when deploy your app on cloud :(
+    // L1 memory is Fast but very Expensive. Basically you pay money for it :(
     @Benchmark
     public long aosBenchmark() {
         long sum = 0;
@@ -63,7 +63,6 @@ public class OopAndCacheMissBench {
 
     // Using SoA you are friendly to silicon optimizations, fast and cost-effective.
     // It can be used natively on distributed computing systems (like DDD applications, Event Sourcing, CQRS)
-    // To build fast, consistent applications.
     // Also, Apache Arrow is perspective format that works in a similar way, and it is become popular :)
     @Benchmark
     public long soaBenchmark() {
@@ -95,7 +94,6 @@ public class OopAndCacheMissBench {
 
     private static StructOfArrays createStructOfArrays(int size) {
         var rnd = ThreadLocalRandom.current();
-        var now = Instant.now();
 
         StructOfArrays soa = new StructOfArrays();
         soa.firstName = new String[size];
