@@ -1,6 +1,5 @@
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -8,9 +7,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.LongAdder;
-import org.junit.jupiter.api.Test;
 
-import jdk.internal.vm.annotation.Contended;
+import org.junit.jupiter.api.Test;
 
 public class FalseSharingDemoTest {
 
@@ -20,7 +18,6 @@ public class FalseSharingDemoTest {
   private static final int ITERATIONS = 10_000_000;
   private static final int RUNS = 5;
 
-  //@Contended
   static final class CompactAtomicLong extends AtomicLong {
   }
 
@@ -28,6 +25,14 @@ public class FalseSharingDemoTest {
     long p01, p02, p03, p04, p05; // this is
     long p06, p07, p08, p09, p10; // unused fields
     long p11, p12, p13, p14, p15; // in the code, lol =D
+  }
+
+  static final class PaddedLong {
+    volatile long value;
+
+    long p01, p02, p03, p04, p05;
+    long p06, p07, p08, p09, p10;
+    long p11, p12, p13, p14, p15;
   }
 
   @Test
@@ -42,8 +47,9 @@ public class FalseSharingDemoTest {
 
       // JIT warmup
       for (int i = 0; i < 2; i++) {
-        run(createCompactCounters(), executor);
-        run(createPaddedCounters(), executor);
+        runAtomic(createCompactCounters(), executor);
+        runAtomic(createPaddedCounters(), executor);
+        runPaddedLong(executor);
         runSingleThreaded();
         runLongAdder(executor);
       }
@@ -52,15 +58,17 @@ public class FalseSharingDemoTest {
 
       for (int i = 1; i <= RUNS; i++) {
 
-        long compact = run(
+        long compact = runAtomic(
             createCompactCounters(),
             executor
         );
 
-        long padded = run(
+        long paddedAtomic = runAtomic(
             createPaddedCounters(),
             executor
         );
+
+        long paddedLong = runPaddedLong(executor);
 
         long single = runSingleThreaded();
 
@@ -69,21 +77,25 @@ public class FalseSharingDemoTest {
         System.out.printf(
             """
             run %d:
-              compact   = %8.2f ms
-              padded    = %8.2f ms
-              single    = %8.2f ms
-              LongAdder = %8.2f ms
-
-              padding speedup:   %.2fx
-              LongAdder speedup: %.2fx
-            %n""",
+            ------------------------------------------------
+              single thread
+                baseline atomic   %8.2f ms
+         
+              multicore atomic
+                compact           %8.2f ms
+                padded            %8.2f ms
+              multicore primitive
+                padded long       %8.2f ms
+              multicore standard
+                LongAdder         %8.2f ms
+            ------------------------------------------------
+            """,
             i,
-            compact / 1_000_000.0,
-            padded / 1_000_000.0,
             single / 1_000_000.0,
-            longAdder / 1_000_000.0,
-            (double) compact / padded,
-            (double) compact / longAdder
+            compact / 1_000_000.0,
+            paddedAtomic / 1_000_000.0,
+            paddedLong / 1_000_000.0,
+            longAdder / 1_000_000.0
         );
       }
     }
@@ -111,7 +123,18 @@ public class FalseSharingDemoTest {
     return counters;
   }
 
-  private static long run(
+  private static PaddedLong[] createPaddedLongCounters() {
+    PaddedLong[] counters = new PaddedLong[THREADS];
+
+    Arrays.setAll(
+        counters,
+        ignored -> new PaddedLong()
+    );
+
+    return counters;
+  }
+
+  private static long runAtomic(
       AtomicLong[] counters,
       ExecutorService executor
   ) throws Exception {
@@ -145,7 +168,47 @@ public class FalseSharingDemoTest {
 
     long elapsed = System.nanoTime() - started;
 
-    verify(counters);
+    verifyAtomic(counters);
+
+    return elapsed;
+  }
+
+  private static long runPaddedLong(
+      ExecutorService executor
+  ) throws Exception {
+
+    PaddedLong[] counters = createPaddedLongCounters();
+
+    CountDownLatch start = new CountDownLatch(1);
+    List<Future<?>> tasks = new ArrayList<>(THREADS);
+
+    for (int i = 0; i < THREADS; i++) {
+      int index = i;
+
+      tasks.add(executor.submit(() -> {
+        start.await();
+
+        PaddedLong counter = counters[index];
+
+        for (int j = 0; j < ITERATIONS; j++) {
+          counter.value++;
+        }
+
+        return null;
+      }));
+    }
+
+    long started = System.nanoTime();
+
+    start.countDown();
+
+    for (Future<?> task : tasks) {
+      task.get();
+    }
+
+    long elapsed = System.nanoTime() - started;
+
+    verifyPaddedLong(counters);
 
     return elapsed;
   }
@@ -165,7 +228,8 @@ public class FalseSharingDemoTest {
 
     if (counter.get() != totalIterations) {
       throw new AssertionError(
-          "Expected: " + totalIterations + ", actual: " + counter.get()
+          "Expected: " + totalIterations +
+              ", actual: " + counter.get()
       );
     }
 
@@ -208,14 +272,17 @@ public class FalseSharingDemoTest {
 
     if (actual != expected) {
       throw new AssertionError(
-          "Expected: " + expected + ", actual: " + actual
+          "Expected: " + expected +
+              ", actual: " + actual
       );
     }
 
     return elapsed;
   }
 
-  private static void verify(AtomicLong[] counters) {
+  private static void verifyAtomic(
+      AtomicLong[] counters
+  ) {
     long actual = Arrays.stream(counters)
         .mapToLong(AtomicLong::get)
         .sum();
@@ -224,7 +291,25 @@ public class FalseSharingDemoTest {
 
     if (actual != expected) {
       throw new AssertionError(
-          "Expected: " + expected + ", actual: " + actual
+          "Expected: " + expected +
+              ", actual: " + actual
+      );
+    }
+  }
+
+  private static void verifyPaddedLong(
+      PaddedLong[] counters
+  ) {
+    long actual = Arrays.stream(counters)
+        .mapToLong(counter -> counter.value)
+        .sum();
+
+    long expected = (long) THREADS * ITERATIONS;
+
+    if (actual != expected) {
+      throw new AssertionError(
+          "Expected: " + expected +
+              ", actual: " + actual
       );
     }
   }
