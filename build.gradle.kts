@@ -6,6 +6,12 @@ plugins {
 group = "by.akozel"
 version = "1.0-SNAPSHOT"
 
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
 repositories {
     mavenCentral()
 }
@@ -23,8 +29,22 @@ tasks.test {
 }
 
 jmh {
-    jvmArgs.set(listOf("-Xms1g", "-Xmx8g"))
-    includes.set(listOf(".*OopAndCacheMissBench.*"))
+    jvmArgs.set(
+        listOf(
+            "-Xms1g",
+            "-Xmx8g"
+        )
+    )
+
+    val include = project.findProperty("jmhInclude") as String?
+
+    if (include != null) {
+        includes.set(listOf(".*$include.*"))
+    }
+
+    profilers.set(listOf("gc"))
+
+    includeTests.set(false)
 }
 
 tasks.withType<JavaCompile>().configureEach {

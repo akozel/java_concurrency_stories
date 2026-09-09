@@ -7,6 +7,8 @@ Project structure
 - LongAdderTest - demonstrates benefit of using LongAdder vs AtomicLong
 - MultipleCountersQuestTest - special quest for those who most attentive
 - FalseSharingDemoTest - one more demo of false sharing
+- ListPerformanceTest - Algo tasks MythBuster: LinkedList vs ArrayList 
+`./gradlew jmh -PjmhInclude=ListPerformanceBenchmark`
 
 
 Use this command to run JMH test:
