@@ -24,9 +24,9 @@ public class FalseSharingDemoTest {
   }
 
   static final class PaddedAtomicLong extends AtomicLong {
-    long p01, p02, p03, p04, p05;
-    long p06, p07, p08, p09, p10;
-    long p11, p12, p13, p14, p15;
+    long p01, p02, p03, p04, p05; // this is
+    long p06, p07, p08, p09, p10; // unused fields
+    long p11, p12, p13, p14, p15; // in the code, lol =D
   }
 
   @Test
