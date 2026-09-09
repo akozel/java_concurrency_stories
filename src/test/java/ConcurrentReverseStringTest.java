@@ -6,13 +6,18 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+// ['123', 'qwe', 'abc', 'qwedft', 'world', 'hello']
+// performance!!!
+// reverse each word
+// in separate threads
+
 public class ConcurrentReverseStringTest {
 
-    static final int N = Integer.getInteger("N", 5_000);
-    static final int M = Integer.getInteger("M", 1_500);
+    static final int N = Integer.getInteger("N", 200_000);
+    static final int M = Integer.getInteger("M", 20);
     static final int THREADS = Integer.getInteger("threads", Runtime.getRuntime().availableProcessors());
     static final int WARMUP = Integer.getInteger("warmup", 30);
-    static final int ITERATIONS = Integer.getInteger("iterations", 15);
+    static final int ITERATIONS = Integer.getInteger("iterations", 10);
     static final long SEED = Long.getLong("seed", 42L);
 
     @Test
@@ -48,7 +53,6 @@ public class ConcurrentReverseStringTest {
 
         ExecutorService executor = Executors.newFixedThreadPool(THREADS);
         try {
-            // Прогрев
             for (int i = 0; i < WARMUP; i++) {
                 reverseWithExecutor(input, executor);
             }
@@ -122,6 +126,50 @@ public class ConcurrentReverseStringTest {
         for (int i = 0; i < futures.size(); i++) {
             String r = futures.get(i).get();
             out[i] = r;
+            checksum = checksum * 31 + r.hashCode();
+        }
+
+        sink = checksum;
+        return out;
+    }
+
+    /**
+     * Coarse-grained variant: the input is split into {@code threads} large chunks,
+     * so only ~{@code threads} tasks are submitted instead of N tiny ones.
+     * Each task writes into its own non-overlapping range of {@code out}, so there is
+     * no synchronization on the hot path. The checksum is computed sequentially
+     * afterwards to avoid sharing a mutable counter between threads.
+     */
+    public static String[] reverseWithExecutorChunked(String[] input, ExecutorService executor, int threads) throws Exception {
+        int len = input.length;
+        String[] out = new String[len];
+
+        if (len == 0) {
+            sink = 1;
+            return out;
+        }
+
+        int effectiveThreads = Math.max(1, Math.min(threads, len));
+        int chunk = (len + effectiveThreads - 1) / effectiveThreads;
+        ArrayList<Future<?>> futures = new ArrayList<>(effectiveThreads);
+
+        for (int t = 0; t < effectiveThreads; t++) {
+            final int start = t * chunk;
+            final int end = Math.min(start + chunk, len);
+            if (start >= end) break;
+            futures.add(executor.submit(() -> {
+                for (int i = start; i < end; i++) {
+                    out[i] = reverse(input[i]);
+                }
+            }));
+        }
+
+        for (Future<?> f : futures) {
+            f.get();
+        }
+
+        long checksum = 1;
+        for (String r : out) {
             checksum = checksum * 31 + r.hashCode();
         }
 
