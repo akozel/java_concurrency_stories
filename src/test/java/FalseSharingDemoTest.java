@@ -6,6 +6,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
 import org.junit.jupiter.api.Test;
 
 public class FalseSharingDemoTest {
@@ -27,7 +28,7 @@ public class FalseSharingDemoTest {
 
   @Test
   public void test() throws Exception {
-    System.out.println("Threads:    " + THREADS);
+    System.out.println("Threads:               " + THREADS);
     System.out.println("Iterations per thread: " + ITERATIONS);
     System.out.println("Total increments:      " + (long) THREADS * ITERATIONS);
     System.out.println();
@@ -40,6 +41,7 @@ public class FalseSharingDemoTest {
         run(createCompactCounters(), executor);
         run(createPaddedCounters(), executor);
         runSingleThreaded();
+        runLongAdder(executor);
       }
 
       System.out.println("---- benchmark ----");
@@ -58,17 +60,26 @@ public class FalseSharingDemoTest {
 
         long single = runSingleThreaded();
 
+        long longAdder = runLongAdder(executor);
+
         System.out.printf(
-            "run %d:%n" +
-                "  compact = %8.2f ms%n" +
-                "  padded  = %8.2f ms%n" +
-                "  single  = %8.2f ms%n" +
-                "  padding speedup: %.2fx%n%n",
+            """
+            run %d:
+              compact   = %8.2f ms
+              padded    = %8.2f ms
+              single    = %8.2f ms
+              LongAdder = %8.2f ms
+
+              padding speedup:   %.2fx
+              LongAdder speedup: %.2fx
+            %n""",
             i,
             compact / 1_000_000.0,
             padded / 1_000_000.0,
             single / 1_000_000.0,
-            (double) compact / padded
+            longAdder / 1_000_000.0,
+            (double) compact / padded,
+            (double) compact / longAdder
         );
       }
     }
@@ -151,6 +162,49 @@ public class FalseSharingDemoTest {
     if (counter.get() != totalIterations) {
       throw new AssertionError(
           "Expected: " + totalIterations + ", actual: " + counter.get()
+      );
+    }
+
+    return elapsed;
+  }
+
+  private static long runLongAdder(
+      ExecutorService executor
+  ) throws Exception {
+
+    LongAdder adder = new LongAdder();
+
+    CountDownLatch start = new CountDownLatch(1);
+    List<Future<?>> tasks = new ArrayList<>(THREADS);
+
+    for (int i = 0; i < THREADS; i++) {
+      tasks.add(executor.submit(() -> {
+        start.await();
+
+        for (int j = 0; j < ITERATIONS; j++) {
+          adder.increment();
+        }
+
+        return null;
+      }));
+    }
+
+    long started = System.nanoTime();
+
+    start.countDown();
+
+    for (Future<?> task : tasks) {
+      task.get();
+    }
+
+    long elapsed = System.nanoTime() - started;
+
+    long expected = (long) THREADS * ITERATIONS;
+    long actual = adder.sum();
+
+    if (actual != expected) {
+      throw new AssertionError(
+          "Expected: " + expected + ", actual: " + actual
       );
     }
 

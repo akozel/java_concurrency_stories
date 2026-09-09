@@ -6,7 +6,8 @@ import java.util.concurrent.atomic.LongAdder;
 public class LongAdderTest {
 
     final long ITERATIONS = 10_000_000L;
-    final int THREADS = 10;
+    final int THREADS =
+        Runtime.getRuntime().availableProcessors();
 
     static long run(Thread[] threads) throws Exception {
         long t0 = System.currentTimeMillis();
