@@ -26,3 +26,19 @@ jmh {
     jvmArgs.set(listOf("-Xms1g", "-Xmx8g"))
     includes.set(listOf(".*OopAndCacheMissBench.*"))
 }
+
+tasks.withType<JavaCompile>().configureEach {
+    options.compilerArgs.addAll(
+        listOf(
+            "--add-exports",
+            "java.base/jdk.internal.vm.annotation=ALL-UNNAMED"
+        )
+    )
+}
+
+tasks.withType<Test>().configureEach {
+    jvmArgs(
+        "--add-exports=java.base/jdk.internal.vm.annotation=ALL-UNNAMED",
+        "-XX:-RestrictContended"
+    )
+}

@@ -9,6 +9,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.LongAdder;
 import org.junit.jupiter.api.Test;
 
+import jdk.internal.vm.annotation.Contended;
+
 public class FalseSharingDemoTest {
 
   private static final int THREADS =
@@ -17,6 +19,7 @@ public class FalseSharingDemoTest {
   private static final int ITERATIONS = 10_000_000;
   private static final int RUNS = 5;
 
+  //@Contended
   static final class CompactAtomicLong extends AtomicLong {
   }
 
