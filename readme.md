@@ -8,6 +8,7 @@ Project structure
 - MultipleCountersQuestTest - special quest for those who most attentive
 - FalseSharingDemoTest - one more demo of false sharing
 - ListPerformanceTest - Algo tasks MythBuster: LinkedList vs ArrayList 
+- FrontEndLearn - example demonstrates what branch prediction is. In the case of `computationBeforeBranch`  add and (Status.PROCESSED == order.status) executing in parallel for modern CPU
 `./gradlew jmh -PjmhInclude=ListPerformanceBenchmark`
 
 
